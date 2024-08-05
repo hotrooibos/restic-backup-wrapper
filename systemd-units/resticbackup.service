@@ -1,0 +1,11 @@
+[Unit]
+Description=Service for Restic Backup script
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /home/user/bin/resticbackup.py backup
+Restart=on-failure
+RestartSec=600
+
+[Install]
+WantedBy=multi-user.target
