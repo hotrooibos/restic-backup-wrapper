@@ -1,8 +1,6 @@
-# Rename this file to "settings.py"
-
 # User settings file for Restic backup script
 
-# Repository settings
+# Restic backup repository settings
 RESTIC_REPOSITORY = "/media/usbdrive/"
 REPO_PASSWORD = "password"
 
@@ -14,10 +12,10 @@ DATA_TO_IGNORE = ["/media/usbdrive/confidential/",
                   "/media/usbdrive/catmemes/cats_with_sombreros/",]
 SNAPSHOT_TAG = "Run by resticbackup.py script"
 
-# Forget settings
+# Forget settings / backup snapshots an datas retention
 KEEP_LAST = 5 # Will keep the 5 last snaphots
-KEEP_DAILY = 5 # Will keep the last snapshot from the 5 last weeks
-KEEP_WEEKLY = 5 # "
+KEEP_DAILY = 5 # Will keep the last snapshot from the 5 last days
+KEEP_WEEKLY = 5 # " 5 last weeks
 KEEP_MONTHLY = 5 # "
 KEEP_YEARLY = 5 # "
 

@@ -5,24 +5,6 @@
 # This script automates restic local backups.
 # Linux OS only. Auto installation (service) designed for systemd (init must be done manually).
 
-# Prerequisites :
-#   - Linux OS (tested on Fedora 40 and WSL2)
-#   - Restic v0.16
-#   - (for service auto install) Systemd
-
-# How to use :
-#   - Clone this git repository
-#   - Customize settings.py
-#   - To run a backup : ./resticbackup.py backup
-#   - To check the restic backup repository : ./resticbackup.py check
-#   - To clean old backups : ./resticbackup.py forget
-
-# Install systemd services :
-#   - ./resticbackups.py install
-#
-# Uninstall systemd services :
-#   - ./resticbackup.py uninstall
-
 from configparser import ConfigParser
 import os
 import settings
