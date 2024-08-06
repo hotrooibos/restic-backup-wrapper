@@ -12,6 +12,9 @@ DATA_TO_IGNORE = ["/media/usbdrive/confidential/",
                   "/media/usbdrive/catmemes/cats_with_sombreros/",]
 SNAPSHOT_TAG = "Run by resticbackup.py script"
 
+# Check settings
+CHECK_SUBSET = "100%" # Subset of random data to read/check, in % or M/G/T
+
 # Forget settings / backup snapshots an datas retention
 KEEP_LAST = 5 # Will keep the 5 last snaphots
 KEEP_DAILY = 5 # Will keep the last snapshot from the 5 last days

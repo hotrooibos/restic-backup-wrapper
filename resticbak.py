@@ -13,8 +13,13 @@ import sys
 
 os.environ['RESTIC_REPOSITORY'] = settings.RESTIC_REPOSITORY
 os.environ['RESTIC_PASSWORD'] = settings.REPO_PASSWORD
-os.environ['RESTIC_CACHE_DIR'] = "/var/cache/restic"
+
+# Set cache dir to /var/cache if script called by root (systemd)
+if os.getuid() == 0:
+    os.environ['RESTIC_CACHE_DIR'] = "/var/cache/restic"
+
 EXCLUDE_FILE = f'{settings.RESTIC_REPOSITORY}/.resticignore'
+
 
 def backup():
     dirs_to_bak = settings.DATA_TO_BAK
@@ -60,13 +65,20 @@ def backup():
 
 
 def check():
-    # restic check --read-data --json
+    '''
+    Perform a structural consistency and integrity verifications of the repository,
+    and an integrity check for the given % from user settings of the backed up data
+    (restic repository pack files), randomly chosen by restic.
+    If data == "100%", it will read the whole, which can be extremely long.
+    
+    NB : Restic also support file size (in K/M/G/T), so for example it can be data="1G"
+    to check 1 Gigabyte randomly picked from the backup data.
+    '''
+    # restic check --read-data-subset=x% --json
     p = subprocess.run(["restic",
                         "check",
-                        "--read-data",
+                        f"--read-data-subset={settings.CHECK_SUBSET}",
                         "--json"])
-
-    print(p)
 
     if p.returncode != 0:
         sys.exit(1)
@@ -178,10 +190,12 @@ def check_setup():
         p = subprocess.run(["restic", "unlock"],
                            stdout=subprocess.DEVNULL,
                            stderr=subprocess.PIPE)
-
+        
     except FileNotFoundError:
         print("Error : Restic not found. Install it first.")
         sys.exit(1)
+
+    print(p.stderr.decode())
 
     if p.returncode != 0:
         print(p.stderr.decode())
