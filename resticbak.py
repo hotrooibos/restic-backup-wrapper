@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Restic Backups script by Antoine Marzin
+# Restic backups script by Antoine Marzin
 #
 # This script automates restic local backups.
 # Linux OS only. Auto installation (service) designed for systemd (init must be done manually).
