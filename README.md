@@ -9,16 +9,16 @@ As of now, it only support local backups.
 
 ## Setup
 - Clone this repo anywhere `git clone https://github.com/hotrooibos/restic-backup-wrapper.git`
-- Edit settings.py to your needs
+- Edit `settings.py` file to suit your needs
 
 ## Run manually
-- Data backup / make a snapshot : `python3 ./resticbak.py backup`
-- Check backup repository (full check, will read all data) : `python3 ./resticbak.py check`
-- Forget old snapshots + and prune (destroy) datas according to your settings : `python3 ./resticbak.py forget`
+- Data backup / create a snapshot : `python3 ./resticbak.py backup`
+- Check backup repository and datas : `resticbak.py check`
+- Forget old snapshots + and prune (destroy) datas according to your settings : `resticbak.py forget`
 
 ## Systemd jobs
 This script allows you to easily install systemd units (service + timer) for each above actions to run automatically, as a job.
 It uses unit files templates from the systemd-units directory and dynamically edit some of its parameters to suit your system configuration and your settings.
 
-- Install systemd jobs according to settings : `python3 ./resticbak.py install `
-- Uninstall : `python3 ./resticbak.py uninstall `
+- Install systemd jobs according to settings : `resticbak.py install `
+- Uninstall : `resticbak.py uninstall `

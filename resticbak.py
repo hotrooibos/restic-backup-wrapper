@@ -48,7 +48,6 @@ def backup():
         subp_args.append(ele)
 
     subp_args.append(f"--exclude-file={EXCLUDE_FILE}")
-    subp_args.append("--no-cache")
     subp_args.append("--json")
     subp_args.append("--tag")
     subp_args.append(settings.SNAPSHOT_TAG)
@@ -195,22 +194,28 @@ def check_setup():
         print("Error : Restic not found. Install it first.")
         sys.exit(1)
 
-    print(p.stderr.decode())
-
+    # Others errors
     if p.returncode != 0:
         print(p.stderr.decode())
         sys.exit(1)
 
-    # TODO check config : URLs in settings exist ?
+    # Test if signal-cli jsonRpc API daemon is up
+    # TODO
+
+def notify(msg: str):
+    '''
+    Execution report via Signal
+    '''
+    # TODO
 
 
 
-print("Restic Backup script by Antoine Marzin")
+print("Restic backup wrapper script")
 
 check_setup()
 
 if len(sys.argv) == 1:
-    print("Usage : resticbackup.py <argument>\n" \
+    print("Usage : resticback up.py <argument>\n" \
           "Arguments :\n" \
           "\tbackup : run a Restic backup\n" \
           "\tcheck : full check the Restic backup repository\n" \
