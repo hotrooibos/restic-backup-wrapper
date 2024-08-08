@@ -8,7 +8,7 @@ import sys
 
 REQ_JAVA_VERSION = 21
 
-print("signal-cli deployment script by Antoine Marzin - 2024")
+print("signal-cli deployment script by Antoine Marzin - 2024\n")
 
 def check_java():
     print("Check java runtime environment", end='', flush=True)
@@ -26,14 +26,18 @@ def check_java():
 
         # Check version requirement
         if int(version) < REQ_JAVA_VERSION:
-            print(f" -> KO (JRE v{REQ_JAVA_VERSION}+ is required, you have v{version})")
+            print(f" -> KO, JRE v{REQ_JAVA_VERSION}+ is required, you have v{version}." \
+                  "\n\nDownload the latest JRE packages here : " \
+                  "https://www.oracle.com/java/technologies/downloads/.")
             sys.exit(1)
         else:
             print(f" -> OK (JRE v{version} found)")
 
     except FileNotFoundError as e:
-        print(f" -> JRE not found, install it (v{REQ_JAVA_VERSION}+) if it's not, or check your PATH")
-        print(f"\nOutput :\n\t{e}")
+        print(f" -> KO, JRE not found, install it (v{REQ_JAVA_VERSION}+) if it's not, " \
+              "or check your PATH.\n\nDownload the latest JRE packages here : " \
+              "https://www.oracle.com/java/technologies/downloads/." \
+              f"\nOutput :\n\t{e}")
         sys.exit(1)
 
 
@@ -49,14 +53,44 @@ def check_signal_cli():
         print(f" -> OK")
 
     except FileNotFoundError as e:
-        print(f" -> signal-cli not found, install it if it's not, or check your PATH")
-        print(f"\nOutput :\n\t{e}")
+        print(" -> KO, signal-cli not found, install it if it's not, or check your PATH." \
+              "\n\nDownload the latest linux native release here : " \
+              "https://github.com/AsamK/signal-cli/releases/latest, and " \
+              "install it in /usr/local/bin/." \
+              f"\nOutput :\n\t{e}")
+        sys.exit(1)
+
+
+def check_qrencode():
+    print("Check qrencode", end='', flush=True)
+
+    try:
+        p = subprocess.run(["qrencode"],
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.PIPE)
+        
+        print(f" -> OK")
+
+    except FileNotFoundError as e:
+        print(" -> KO, qrencode not found, please install it first " \
+              "\n(ex : dnf install qrencode / apt install qrencode)." \
+              f"\nOutput :\n\t{e}")
         sys.exit(1)
 
 
 def register():
     print("Register account")
     # TODO register account with phone/QR code (qrencode app)
+
+    check_qrencode()
+    pair = input("Do you wish to link to an existing device ? [y/N]")
+
+    # TODO signal-cli link | tee >(xargs -L 1 qrencode -t utf8)
+
+    # if pair == "y":
+    #     ps1 = subprocess.run(["signal-cli link | tee >[xargs -L 1 qrencode -t utf8]"],
+    #                          shell=True)
+        
 
 def install_daemon():
     print("Install daemon")
@@ -69,3 +103,4 @@ def check_test():
 
 check_java()
 check_signal_cli()
+register()
