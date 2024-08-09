@@ -79,19 +79,28 @@ def register():
         print("\nRegister account")
         # TODO check if existing account exists, if so ask to use it y/n
         
-        # TODO if no account or "no"
         inp = input("Do you wish to link to an existing master (phone) ? [y/N]")
         
         if inp in ("y", "Y"):
             check_qrencode()
+
+            device_name = input("What should this device named ? [default : cli] ")
             
-            print("Flash the following QR code from your phone's Signal settings.\nPress Ctrl+C to abort.\n")
+            if device_name == "": device_name = "cli"
+            
+            input("Your terminal display theme must be dark (light text/dark background) " \
+                  "for the QR code to be read by Signal app. Press ENTER when ready.")
+
+            print("Flash the following QR code from your phone's Signal settings.\n" \
+                  "Press Ctrl+C to abort.\n")
 
             # Request a Signal linking URL, and print the output in stdout
             # both in string, and as a QR code. Equivalent to the following cmd :
             # signal-cli link | tee >(xargs -L 1 qrencode -t utf8)
             # Ref : https://github.com/AsamK/signal-cli/wiki/Linking-other-devices-%28Provisioning%29
-            ps = subprocess.Popen(['signal-cli', 'link'], stdout=subprocess.PIPE)
+            ps = subprocess.Popen(['signal-cli', 'link',
+                                   '-n', device_name],
+                                   stdout=subprocess.PIPE)
 
             for line in ps.stdout:
                 strline = line.decode('utf-8')
@@ -100,14 +109,14 @@ def register():
                 print(strline, end='')
 
             ps.wait()
-
             break
 
+        # TODO process to create a new Signal master device
         elif inp in ("n", "N", ""):
             inp = input("Do you wish to create a new master device ? [y/N]")
 
             if inp in ("y", "Y"):
-                print("TODO create new master device : https://github.com/AsamK/signal-cli/wiki/Quickstart#set-up-an-account")
+                print("Create new master device : https://github.com/AsamK/signal-cli/wiki/Quickstart#set-up-an-account")
                 break
 
             elif inp in ("n", "N", ""):
@@ -124,9 +133,6 @@ def install_daemon():
 def check_test():
     print("Check test final")
     # TODO check with sending a msg (note to self)
-
-
-
 
 
 while True:
