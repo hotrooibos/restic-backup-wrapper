@@ -8,7 +8,7 @@ import sys
 
 REQ_JAVA_VERSION = 21
 
-print("signal-cli deployment script by Antoine Marzin - 2024\n")
+print("signal-cli deployment script by Antoine Marzin - 2024")
 
 def check_java():
     print("Check java runtime environment", end='', flush=True)
@@ -62,45 +62,86 @@ def check_signal_cli():
 
 
 def check_qrencode():
-    print("Check qrencode", end='', flush=True)
-
     try:
         p = subprocess.run(["qrencode"],
                             stdout=subprocess.DEVNULL,
                             stderr=subprocess.PIPE)
-        
-        print(f" -> OK")
 
     except FileNotFoundError as e:
-        print(" -> KO, qrencode not found, please install it first " \
+        print("Qrencode not found, please install it first " \
               "\n(ex : dnf install qrencode / apt install qrencode)." \
               f"\nOutput :\n\t{e}")
         sys.exit(1)
 
 
 def register():
-    print("Register account")
-    # TODO register account with phone/QR code (qrencode app)
+    while True:
+        print("\nRegister account")
+        # TODO check if existing account exists, if so ask to use it y/n
+        
+        # TODO if no account or "no"
+        inp = input("Do you wish to link to an existing master (phone) ? [y/N]")
+        
+        if inp in ("y", "Y"):
+            check_qrencode()
+            
+            print("Flash the following QR code from your phone's Signal settings.\nPress Ctrl+C to abort.\n")
 
-    check_qrencode()
-    pair = input("Do you wish to link to an existing device ? [y/N]")
+            # Request a Signal linking URL, and print the output in stdout
+            # both in string, and as a QR code. Equivalent to the following cmd :
+            # signal-cli link | tee >(xargs -L 1 qrencode -t utf8)
+            # Ref : https://github.com/AsamK/signal-cli/wiki/Linking-other-devices-%28Provisioning%29
+            ps = subprocess.Popen(['signal-cli', 'link'], stdout=subprocess.PIPE)
 
-    # TODO signal-cli link | tee >(xargs -L 1 qrencode -t utf8)
+            for line in ps.stdout:
+                strline = line.decode('utf-8')
+                subprocess.run(['qrencode', '-t', 'utf8'],
+                                input=strline.encode('utf-8'))
+                print(strline, end='')
 
-    # if pair == "y":
-    #     ps1 = subprocess.run(["signal-cli link | tee >[xargs -L 1 qrencode -t utf8]"],
-    #                          shell=True)
+            ps.wait()
+
+            break
+
+        elif inp in ("n", "N", ""):
+            inp = input("Do you wish to create a new master device ? [y/N]")
+
+            if inp in ("y", "Y"):
+                print("TODO create new master device : https://github.com/AsamK/signal-cli/wiki/Quickstart#set-up-an-account")
+                break
+
+            elif inp in ("n", "N", ""):
+                break
         
 
 def install_daemon():
-    print("Install daemon")
-    # TODO install and run signal-cli daemon (jsonRpc)
+    print("\nTODO Install systemd service/timer")
+    # TODO install systemd service/timer that run signal-cli daemon (jsonRpc)
+    # ask for port (default 8080)
+    # run the following at startup and now
+    # signal-cli -a +33123456789 daemon --http=localhost:8080 
 
 def check_test():
     print("Check test final")
     # TODO check with sending a msg (note to self)
 
 
-check_java()
-check_signal_cli()
-register()
+
+
+
+while True:
+    inp = input("\n[0] Check config\n" \
+                "[1] Setup Signal\n" \
+                "[2] Install Signal API (JSON-RPC requests) daemon\n" \
+                "[9] Exit\n:")
+
+    if inp == "0":
+        check_java()
+        check_signal_cli()
+        check_test()
+    elif inp == "1":
+        register()
+    elif inp == "2":
+        install_daemon()
+    elif inp == "9":
+        sys.exit(0)
