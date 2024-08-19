@@ -84,7 +84,7 @@ def register():
         if inp in ("y", "Y"):
             check_qrencode()
 
-            device_name = input("What should this device named ? [default : cli] ")
+            device_name = input("What should this device be named ? [default : cli] ")
             
             if device_name == "": device_name = "cli"
             
@@ -134,20 +134,43 @@ def check_test():
     print("Check test final")
     # TODO check with sending a msg (note to self)
 
+def menu_gen(title, *args):
+    """
+    Generate a CLI selection menu
+    """
+    if 99 < len(args) == 0:
+        raise Exception("Error in menu generator")
 
-while True:
-    inp = input("\n[0] Check config\n" \
-                "[1] Setup Signal\n" \
-                "[2] Install Signal API (JSON-RPC requests) daemon\n" \
-                "[9] Exit\n:")
+    while True:
+        print(title)
+        for idx, val in enumerate(args):
+            print(f"  [{idx+1}] {val}")
 
-    if inp == "0":
-        check_java()
-        check_signal_cli()
-        check_test()
-    elif inp == "1":
-        register()
-    elif inp == "2":
-        install_daemon()
-    elif inp == "9":
-        sys.exit(0)
+        if idx == len(args)-1:
+            print(f"  [0] Exit / cancel")
+
+        res = input(":")
+
+        try:
+            if res == "0":
+                sys.exit(0)
+            elif (int(res) > len(args)):
+                continue
+            else:
+                return res
+        except ValueError:
+            continue
+
+inp = menu_gen("\nMain menu",
+               "Check config",
+               "Setup Signal",
+               "Install Signal API (JSON-RPC requests) daemon")
+
+if inp == "1":
+    check_java()
+    check_signal_cli()
+    check_test()
+elif inp == "2":
+    register()
+elif inp == "3":
+    install_daemon()
