@@ -75,53 +75,63 @@ def check_qrencode():
 
 
 def register():
-    while True:
-        print("\nRegister account")
-        # TODO check if existing account exists, if so ask to use it y/n
+    inp = menu_gen("\nRegister account",
+                   "List local Signal accounts",
+                   "Link this device to an existing master (phone)",
+                   "Create a new master device",
+                   "(Destructive!) Remove all local Signal data")
+
+    if inp == "1":
+        ps = subprocess.run(['signal-cli', 'listAccounts'],
+                            stdout=subprocess.PIPE)
+        if ps.stdout.decode() == "":
+            print("No local Signal account data found.")
+        else:
+            print(ps.stdout.decode())
+
+
+    if inp == "2":
+        check_qrencode()
+
+        device_name = input("What should this device be named ? [default : cli] ")
         
-        inp = input("Do you wish to link to an existing master (phone) ? [y/N]")
+        if device_name == "": device_name = "cli"
         
-        if inp in ("y", "Y"):
-            check_qrencode()
+        input("Your terminal display theme must be dark (light text/dark background) " \
+                "for the QR code to be read by Signal app. Press ENTER when ready.")
 
-            device_name = input("What should this device be named ? [default : cli] ")
-            
-            if device_name == "": device_name = "cli"
-            
-            input("Your terminal display theme must be dark (light text/dark background) " \
-                  "for the QR code to be read by Signal app. Press ENTER when ready.")
+        print("Flash the following QR code from your phone's Signal settings.\n" \
+                "Press Ctrl+C to abort.\n")
 
-            print("Flash the following QR code from your phone's Signal settings.\n" \
-                  "Press Ctrl+C to abort.\n")
+        # Request a Signal linking URL, and print the output in stdout
+        # both in string, and as a QR code. Equivalent to the following cmd :
+        # signal-cli link | tee >(xargs -L 1 qrencode -t utf8)
+        # Ref : https://github.com/AsamK/signal-cli/wiki/Linking-other-devices-%28Provisioning%29
+        ps = subprocess.Popen(['signal-cli', 'link',
+                                '-n', device_name],
+                                stdout=subprocess.PIPE)
 
-            # Request a Signal linking URL, and print the output in stdout
-            # both in string, and as a QR code. Equivalent to the following cmd :
-            # signal-cli link | tee >(xargs -L 1 qrencode -t utf8)
-            # Ref : https://github.com/AsamK/signal-cli/wiki/Linking-other-devices-%28Provisioning%29
-            ps = subprocess.Popen(['signal-cli', 'link',
-                                   '-n', device_name],
-                                   stdout=subprocess.PIPE)
+        for line in ps.stdout:
+            strline = line.decode('utf-8')
+            subprocess.run(['qrencode', '-t', 'utf8'],
+                            input=strline.encode('utf-8'))
+            print(strline, end='')
 
-            for line in ps.stdout:
-                strline = line.decode('utf-8')
-                subprocess.run(['qrencode', '-t', 'utf8'],
-                                input=strline.encode('utf-8'))
-                print(strline, end='')
+        ps.wait()
+ 
+    if inp == "3":
+        # TODO create new master device
+        print("Create new master device : https://github.com/AsamK/signal-cli/wiki/Quickstart#set-up-an-account")
+    
+    if inp == "4":
+        inp = input("This is a destructive action that will delete all local Signal data "\
+                    "(registered/linked accounts).\nType \"DELETE\" to proceed.\n:")
+        if inp == "DELETE":
+            subprocess.run(['signal-cli', 'deleteLocalAccountData'])
+            print("Local data removed.")
+        else:
+            print("Abort.")
 
-            ps.wait()
-            break
-
-        # TODO process to create a new Signal master device
-        elif inp in ("n", "N", ""):
-            inp = input("Do you wish to create a new master device ? [y/N]")
-
-            if inp in ("y", "Y"):
-                print("Create new master device : https://github.com/AsamK/signal-cli/wiki/Quickstart#set-up-an-account")
-                break
-
-            elif inp in ("n", "N", ""):
-                break
-        
 
 def install_daemon():
     print("\nTODO Install systemd service/timer")
@@ -152,25 +162,26 @@ def menu_gen(title, *args):
         res = input(":")
 
         try:
-            if res == "0":
-                sys.exit(0)
-            elif (int(res) > len(args)):
+            if (int(res) > len(args)):
                 continue
             else:
                 return res
         except ValueError:
             continue
 
-inp = menu_gen("\nMain menu",
-               "Check config",
-               "Setup Signal",
-               "Install Signal API (JSON-RPC requests) daemon")
+while True:
+    inp = menu_gen("\nMain menu",
+                "Check config",
+                "Setup Signal",
+                "Install Signal API (JSON-RPC requests) daemon")
 
-if inp == "1":
-    check_java()
-    check_signal_cli()
-    check_test()
-elif inp == "2":
-    register()
-elif inp == "3":
-    install_daemon()
+    if inp == "1":
+        check_java()
+        check_signal_cli()
+        check_test()
+    elif inp == "2":
+        register()
+    elif inp == "3":
+        install_daemon()
+    elif inp == "0":
+        sys.exit(0)
