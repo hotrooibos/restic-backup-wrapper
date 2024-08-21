@@ -74,64 +74,119 @@ def check_qrencode():
         sys.exit(1)
 
 
-def register():
-    inp = menu_gen("\nRegister account",
-                   "List local Signal accounts",
-                   "Link this device to an existing master (phone)",
-                   "Create a new master device",
-                   "(Destructive!) Remove all local Signal data")
+def manage():
+    while True:
+        inp = menu_gen("Signal management",
+                    ["List local Signal accounts",
+                    "Link this device to an existing master (phone)",
+                    "Create a new master device",
+                    "Remove local accounts"])
 
-    if inp == "1":
-        ps = subprocess.run(['signal-cli', 'listAccounts'],
-                            stdout=subprocess.PIPE)
-        if ps.stdout.decode() == "":
-            print("No local Signal account data found.")
-        else:
-            print(ps.stdout.decode())
-
-
-    if inp == "2":
-        check_qrencode()
-
-        device_name = input("What should this device be named ? [default : cli] ")
+        # Exit register
+        if inp == "0":
+            return
         
-        if device_name == "": device_name = "cli"
-        
-        input("Your terminal display theme must be dark (light text/dark background) " \
-                "for the QR code to be read by Signal app. Press ENTER when ready.")
+        # List accounts
+        if inp == "1":
+            ps = subprocess.run(['signal-cli', 'listAccounts'],
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+            if ps.stdout.decode() == "" \
+            and ps.stderr.decode() == "":
+                print("No local Signal account data found.")
+            else:
+                print(ps.stdout.decode()) if ps.stdout.decode() else None
+                print(ps.stderr.decode()) if ps.stderr.decode() else None
+            continue
 
-        print("Flash the following QR code from your phone's Signal settings.\n" \
-                "Press Ctrl+C to abort.\n")
+        # Link to a device (gen a QR code)
+        if inp == "2":
+            check_qrencode()
 
-        # Request a Signal linking URL, and print the output in stdout
-        # both in string, and as a QR code. Equivalent to the following cmd :
-        # signal-cli link | tee >(xargs -L 1 qrencode -t utf8)
-        # Ref : https://github.com/AsamK/signal-cli/wiki/Linking-other-devices-%28Provisioning%29
-        ps = subprocess.Popen(['signal-cli', 'link',
-                                '-n', device_name],
-                                stdout=subprocess.PIPE)
+            device_name = input("What should this device be named ? [default : cli] ")
+            
+            if device_name == "": device_name = "cli"
+            
+            input("Your terminal display theme must be dark (light text/dark background) " \
+                    "for the QR code to be read by Signal app. Press ENTER when ready.")
 
-        for line in ps.stdout:
-            strline = line.decode('utf-8')
-            subprocess.run(['qrencode', '-t', 'utf8'],
-                            input=strline.encode('utf-8'))
-            print(strline, end='')
+            print("Flash the following QR code from your phone's Signal settings.\n" \
+                    "Press Ctrl+C to abort.\n")
 
-        ps.wait()
- 
-    if inp == "3":
-        # TODO create new master device
-        print("Create new master device : https://github.com/AsamK/signal-cli/wiki/Quickstart#set-up-an-account")
+            # Request a Signal linking URL, and print the output in stdout
+            # both in string, and as a QR code. Equivalent to the following cmd :
+            # signal-cli link | tee >(xargs -L 1 qrencode -t utf8)
+            # Ref : https://github.com/AsamK/signal-cli/wiki/Linking-other-devices-%28Provisioning%29
+            ps = subprocess.Popen(['signal-cli', 'link',
+                                    '-n', device_name],
+                                    stdout=subprocess.PIPE)
+
+            for line in ps.stdout:
+                strline = line.decode('utf-8')
+                subprocess.run(['qrencode', '-t', 'utf8'],
+                                input=strline.encode('utf-8'))
+                print(strline, end='')
+
+            ps.wait()
+            continue
     
-    if inp == "4":
-        inp = input("This is a destructive action that will delete all local Signal data "\
-                    "(registered/linked accounts).\nType \"DELETE\" to proceed.\n:")
-        if inp == "DELETE":
-            subprocess.run(['signal-cli', 'deleteLocalAccountData'])
-            print("Local data removed.")
-        else:
-            print("Abort.")
+        # Create a new master device
+        if inp == "3":
+            # https://github.com/AsamK/signal-cli/wiki/Quickstart#set-up-an-account")
+            phone_number = input("Phone number with country code" \
+                                "(french mobile example: +33612345678)\n:")
+            ps = subprocess.run(['signal-cli', '-u', phone_number, 'register'],
+                                stderr=subprocess.PIPE)
+            
+            if "CAPTCHA" in ps.stderr.decode():
+                captcha_link = input("Captcha required. Open https://signalcaptchas.org/registration/generate.html " \
+                                ", resolve the captcha, and paste here the URL from the " \
+                                "\"Open Signal\" link\n:")
+                ps = subprocess.run(['signal-cli', '-u', phone_number, 'register',
+                                    '--captcha', captcha_link])
+            continue
+                
+        # Delete accounts
+        if inp == "4":
+            ps = subprocess.run(['signal-cli', 'listAccounts'],
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+            
+            # Get phone numbers (format "+XXXXXXXXXX")
+            # from 'signal-cli listAccounts' output
+            # with regex, and store them in a list
+            output = ps.stderr.decode().split("\n")
+            pattern = "\+[^:]+"
+            accounts = []
 
+            for line in output:
+                if len(line) > 0:
+                    match = re.search(pattern, line)
+                    accounts.append(match.group())
+            
+            while len(accounts) > 0:
+                inp = menu_gen("Which account do you want to remove ?",
+                                accounts)
+                
+                if inp == "0":
+                    break
+
+                acc_to_del = accounts[int(inp)-1]
+                ps = subprocess.run(['signal-cli',
+                                    '-u',
+                                    acc_to_del,
+                                    'deleteLocalAccountData'],
+                                    stderr=subprocess.PIPE)
+                
+                if ps.returncode == 0:
+                    print(f"Local data removed for {acc_to_del}.")
+                    accounts.pop(int(inp)-1)
+                else:
+                    print(ps.stderr.decode())
+            else:
+                print("No local Signal account data found.")
+
+            continue
 
 def install_daemon():
     print("\nTODO Install systemd service/timer")
@@ -144,25 +199,26 @@ def check_test():
     print("Check test final")
     # TODO check with sending a msg (note to self)
 
-def menu_gen(title, *args):
+def menu_gen(title: str, entries: list) -> str:
     """
     Generate a CLI selection menu
     """
-    if 99 < len(args) == 0:
+    if 99 < len(entries) == 0:
         raise Exception("Error in menu generator")
 
     while True:
-        print(title)
-        for idx, val in enumerate(args):
-            print(f"  [{idx+1}] {val}")
+        print(f"\n{title}")
 
-        if idx == len(args)-1:
-            print(f"  [0] Exit / cancel")
+        for i, v in enumerate(entries):
+            print(f"  [{i+1}] {v}")
+
+            if i == len(entries)-1:
+                print(f"  [0] Exit / cancel")
 
         res = input(":")
 
         try:
-            if (int(res) > len(args)):
+            if (int(res) > len(entries)):
                 continue
             else:
                 return res
@@ -170,18 +226,21 @@ def menu_gen(title, *args):
             continue
 
 while True:
-    inp = menu_gen("\nMain menu",
-                "Check config",
-                "Setup Signal",
-                "Install Signal API (JSON-RPC requests) daemon")
+    inp = menu_gen("Main menu",
+                   ["Check config",
+                   "Signal management",
+                   "Install Signal API (JSON-RPC requests) daemon"])
 
-    if inp == "1":
+    if inp == "0":
+        sys.exit(0)
+    
+    elif inp == "1":
         check_java()
         check_signal_cli()
         check_test()
+    
     elif inp == "2":
-        register()
+        manage()
+    
     elif inp == "3":
         install_daemon()
-    elif inp == "0":
-        sys.exit(0)
