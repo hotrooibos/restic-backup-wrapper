@@ -144,6 +144,13 @@ def manage():
                                 "\"Open Signal\" link\n:")
                 ps = subprocess.run(['signal-cli', '-u', phone_number, 'register',
                                     '--captcha', captcha_link])
+
+            verif_code = input("Type the verification code you received by SMS." \
+                               "The format should match 123-456\n:")
+
+            subprocess.run(['signal-cli', '-u', phone_number,
+                            'verify', verif_code])
+
             continue
                 
         # Delete accounts
@@ -155,14 +162,16 @@ def manage():
             # Get phone numbers (format "+XXXXXXXXXX")
             # from 'signal-cli listAccounts' output
             # with regex, and store them in a list
-            output = ps.stderr.decode().split("\n")
-            pattern = "\+[^:]+"
+            output = ps.stdout.decode().split("\n") + \
+                ps.stderr.decode().split("\n")
+            pattern = "\+\d+"
             accounts = []
 
             for line in output:
                 if len(line) > 0:
                     match = re.search(pattern, line)
-                    accounts.append(match.group())
+                    if match:
+                        accounts.append(match.group())
             
             while len(accounts) > 0:
                 inp = menu_gen("Which account do you want to remove ?",
@@ -181,8 +190,25 @@ def manage():
                 if ps.returncode == 0:
                     print(f"Local data removed for {acc_to_del}.")
                     accounts.pop(int(inp)-1)
+                    break
                 else:
-                    print(ps.stderr.decode())
+                    err_msg = ps.stderr.decode()
+                    print(err_msg)
+
+                    if "--ignore-registered" in err_msg:
+                        inp_unreg = input("Do you want to " \
+                            f"unregister {acc_to_del} ? [y/N]")
+                        
+                        if inp_unreg in ("Y", "y"):
+                            ps = subprocess.run(['signal-cli',
+                                                'unregister'])
+                            if ps.returncode == 0:
+                                print(f"{acc_to_del} unregistered.")
+                    else:
+                        break
+            
+                        
+
             else:
                 print("No local Signal account data found.")
 
