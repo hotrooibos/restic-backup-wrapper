@@ -74,6 +74,39 @@ def check_qrencode():
         sys.exit(1)
 
 
+def get_local_accounts(return_unregistered=True) -> list:
+    """
+    Run "signal-cli listAccounts" and extract from its
+    output (with regex) the local Signal accounts.
+    Return a list of accounts/phone numbers.
+    ex : ['+33633333333', '+33699999999', '+33651515151']
+    """
+    ps = subprocess.run(['signal-cli', 'listAccounts'],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE)
+    
+    # Get phone numbers (format "+XXXXXXXXXX")
+    # from 'signal-cli listAccounts' output
+    # with regex, and store them in a list
+    reg_acc = ps.stdout.decode().split("\n") 
+    unreg_acc = ps.stderr.decode().split("\n")
+    
+    output = reg_acc
+    if return_unregistered:
+        output += unreg_acc
+
+    pattern = "\+\d+"
+    accounts = []
+
+    for line in output:
+        if len(line) > 0:
+            match = re.search(pattern, line)
+            if match:
+                accounts.append(match.group())
+    
+    return accounts
+
+
 def manage():
     while True:
         inp = menu_gen("Signal management",
@@ -144,6 +177,9 @@ def manage():
                                 "\"Open Signal\" link\n:")
                 ps = subprocess.run(['signal-cli', '-u', phone_number, 'register',
                                     '--captcha', captcha_link])
+                
+                if ps.returncode != 0:
+                    continue
 
             verif_code = input("Type the verification code you received by SMS." \
                                "The format should match 123-456\n:")
@@ -155,23 +191,7 @@ def manage():
                 
         # Delete accounts
         if inp == "4":
-            ps = subprocess.run(['signal-cli', 'listAccounts'],
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE)
-            
-            # Get phone numbers (format "+XXXXXXXXXX")
-            # from 'signal-cli listAccounts' output
-            # with regex, and store them in a list
-            output = ps.stdout.decode().split("\n") + \
-                ps.stderr.decode().split("\n")
-            pattern = "\+\d+"
-            accounts = []
-
-            for line in output:
-                if len(line) > 0:
-                    match = re.search(pattern, line)
-                    if match:
-                        accounts.append(match.group())
+            accounts = get_local_accounts()
             
             while len(accounts) > 0:
                 inp = menu_gen("Which account do you want to remove ?",
@@ -206,8 +226,6 @@ def manage():
                                 print(f"{acc_to_del} unregistered.")
                     else:
                         break
-            
-                        
 
             else:
                 print("No local Signal account data found.")
@@ -215,11 +233,51 @@ def manage():
             continue
 
 def install_daemon():
-    print("\nTODO Install systemd service/timer")
+    print("\nRun daemon")
     # TODO install systemd service/timer that run signal-cli daemon (jsonRpc)
-    # ask for port (default 8080)
-    # run the following at startup and now
-    # signal-cli -a +33123456789 daemon --http=localhost:8080 
+
+    # Set tcp port listened by daemon
+    while True:
+        port = input("On what local host port will signal-cli daemon " \
+                    "run ? [default : 8008]\n:")
+        
+        if port == "":
+            port = "8008"
+
+        pattern = "^(?:[1-9][0-9]{0,4})$"
+
+        match = re.search(pattern, port)
+
+        if match:
+            break
+        else:
+            print("Wrong port format (must be in 1-9999).")
+
+    
+    # Pick the Signal account (phone number) to be used by daemon
+    accounts = get_local_accounts(return_unregistered=False)
+
+    if len(accounts) == 0:
+        print("No registered Signal account found, register one first.")
+        return
+
+    while len(accounts) > 0:
+        inp = menu_gen("Which Signal account will be used ?",
+                       accounts)
+        
+        if inp == "0":
+            return
+        elif int(inp) in range(1, len(accounts)+1):
+            account = accounts[int(inp)-1]
+            break
+    
+    # Run daemon
+    # signal-cli -a +33123456789 daemon --http=localhost:8008
+    ps = subprocess.run(['signal-cli', '-a', account,
+                         'daemon', f'--http=localhost:{port}'])
+
+    
+
 
 def check_test():
     print("Check test final")
