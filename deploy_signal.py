@@ -95,7 +95,7 @@ def get_local_accounts(return_unregistered=True) -> list:
     if return_unregistered:
         output += unreg_acc
 
-    pattern = "\+\d+"
+    pattern = "\\+\\d+"
     accounts = []
 
     for line in output:
@@ -150,17 +150,22 @@ def manage():
             # both in string, and as a QR code. Equivalent to the following cmd :
             # signal-cli link | tee >(xargs -L 1 qrencode -t utf8)
             # Ref : https://github.com/AsamK/signal-cli/wiki/Linking-other-devices-%28Provisioning%29
-            ps = subprocess.Popen(['signal-cli', 'link',
-                                    '-n', device_name],
-                                    stdout=subprocess.PIPE)
+            try:
+                ps = subprocess.Popen(['signal-cli', 'link',
+                                      '-n', device_name],
+                                      stdout=subprocess.PIPE)
 
-            for line in ps.stdout:
-                strline = line.decode('utf-8')
-                subprocess.run(['qrencode', '-t', 'utf8'],
-                                input=strline.encode('utf-8'))
-                print(strline, end='')
+                for line in ps.stdout:
+                    strline = line.decode('utf-8')
+                    subprocess.run(['qrencode', '-t', 'utf8'],
+                                    input=strline.encode('utf-8'))
+                    print(strline, end='')
 
-            ps.wait()
+                ps.wait()
+
+            except KeyboardInterrupt:
+                continue
+            
             continue
     
         # Create a new master device
@@ -251,7 +256,7 @@ def install_daemon():
         if match:
             break
         else:
-            print("Wrong port format (must be in 1-9999).")
+            print("Wrong port format (must be in range 1-9999).")
 
     
     # Pick the Signal account (phone number) to be used by daemon
@@ -273,10 +278,11 @@ def install_daemon():
     
     # Run daemon
     # signal-cli -a +33123456789 daemon --http=localhost:8008
-    ps = subprocess.run(['signal-cli', '-a', account,
-                         'daemon', f'--http=localhost:{port}'])
-
-    
+    try:
+        ps = subprocess.run(['signal-cli', '-a', account,
+                            'daemon', f'--http=localhost:{port}'])
+    except KeyboardInterrupt:
+        return
 
 
 def check_test():
