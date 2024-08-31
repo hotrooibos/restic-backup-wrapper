@@ -1,6 +1,6 @@
 # User settings file for Restic backup script
 
-# Restic backup repository settings
+# Repository settings
 RESTIC_REPOSITORY = "/media/usbdrive/"
 REPO_PASSWORD = "password"
 
@@ -27,3 +27,8 @@ KEEP_YEARLY = 5 # "
 CALENDAR_BACKUP = "daily"           # Every day except sunday, at midnight
 CALENDAR_CHECK = "*-*-* 04:00:00"   # Every day at 4:00am
 CALENDAR_FORGET = "monthly"         # Every month (the first of each month)
+
+# Notify settings
+NOTIFY = False
+SIGNAL_API_URL = "http://localhost:8008/api/v1/rpc"
+SIGNAL_RECEIVER = "+33612345678"

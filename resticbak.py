@@ -5,10 +5,12 @@
 # This script automates restic local backups.
 # Linux OS only. Auto installation (service) designed for systemd (init must be done manually).
 
-from configparser import ConfigParser
+import json
 import os
+import requests
 import settings
 import subprocess
+import set_systemd
 import sys
 
 os.environ['RESTIC_REPOSITORY'] = settings.RESTIC_REPOSITORY
@@ -55,11 +57,44 @@ def backup():
 
     # Run Restic command
     # ex : restic backup /path/to/data --exclude-file=/path/to/repo/.resticignore --json --tag "Run by resticbackup.py script"
-    p = subprocess.run(subp_args)
+    ps = subprocess.Popen(subp_args,
+                          text=True,
+                          stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE)
 
-    print(p)
+    for line in ps.stdout:
+        out_json = json.loads(line)
 
-    if p.returncode != 0:
+        if out_json['message_type'] == "summary":
+            sumj = out_json
+
+    for error_line in ps.stderr:
+        print(error_line, end='')
+
+    ps.wait()
+
+    if ps.returncode == 0:
+        summary = "Backup successful\n" \
+                  f"- {sumj['files_new']} new files\n" \
+                  f"- {sumj['files_changed']} changed files\n" \
+                  f"- {sumj['files_unmodified']} unmodified files\n" \
+                  f"- {sumj['dirs_new']} new directories\n" \
+                  f"- {sumj['dirs_changed']} changed directories\n" \
+                  f"- {sumj['dirs_unmodified']} unmodified directories\n" \
+                  f"- {sumj['data_blobs']} data blobs\n" \
+                  f"- {sumj['tree_blobs']} tree blobs\n" \
+                  f"- {sumj['data_added']} data added\n" \
+                  f"- {sumj['total_files_processed']} files processed\n" \
+                  f"- {sumj['total_bytes_processed']} bytes processed\n" \
+                  f"- Backup duration : {sumj['total_duration']}s\n" \
+                  f"- Snapshot ID : {sumj['snapshot_id']}"
+        
+        if settings.NOTIFY:
+            notify(settings.SIGNAL_API_URL,
+                   settings.SIGNAL_RECEIVER,
+                   summary)
+    else:
+        print(ps.stderr.decode())
         sys.exit(1)
 
 
@@ -74,94 +109,75 @@ def check():
     to check 1 Gigabyte randomly picked from the backup data.
     '''
     # restic check --read-data-subset=x% --json
-    p = subprocess.run(["restic",
-                        "check",
-                        f"--read-data-subset={settings.CHECK_SUBSET}",
-                        "--json"])
+    ps = subprocess.Popen(["restic", "check",
+                          f"--read-data-subset={settings.CHECK_SUBSET}"],
+                          text=True,
+                          stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE)
+    
+    for line in ps.stdout:
+        print(line, end='')
 
-    if p.returncode != 0:
+    for error_line in ps.stderr:
+        print(error_line, end='')
+
+    if ps.returncode == 0:
+        print(ps.stdout)
+        
+        if settings.NOTIFY:
+            notify(settings.SIGNAL_API_URL,
+                   settings.SIGNAL_RECEIVER,
+                   ps.stdout)
+    else:
+        print(ps.stderr.decode())
         sys.exit(1)
 
 
 def forget():
     # restic forget --prune --keep-last 5 --keep-daily 5 --keep-weekly 5 --keep-monthly 5 --keep-yearly 5
-    p = subprocess.run(["restic",
-                        "forget",
-                        "--keep-last", str(settings.KEEP_LAST),
-                        "--keep-daily", str(settings.KEEP_DAILY),
-                        "--keep-weekly", str(settings.KEEP_WEEKLY),
-                        "--keep-monthly", str(settings.KEEP_MONTHLY),
-                        "--keep-yearly", str(settings.KEEP_YEARLY),
-                        # "--dry-run",
-                        "--prune"])
+    ps = subprocess.run(["restic", "forget",
+                         "--keep-last", str(settings.KEEP_LAST),
+                         "--keep-daily", str(settings.KEEP_DAILY),
+                         "--keep-weekly", str(settings.KEEP_WEEKLY),
+                         "--keep-monthly", str(settings.KEEP_MONTHLY),
+                         "--keep-yearly", str(settings.KEEP_YEARLY),
+                         # "--dry-run",
+                         "--prune"],
+                         stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE)
     
-    print(p)
-
-    if p.returncode != 0:
+    if ps.returncode == 0:
+        print(ps.stdout.decode())
+        
+        if settings.NOTIFY:
+            notify(settings.SIGNAL_API_URL,
+                   settings.SIGNAL_RECEIVER,
+                   ps.stdout.decode())
+    else:
+        print(ps.stderr.decode())
         sys.exit(1)
 
-
-def install_proc(process):
-    '''
-    Auto configure and install Systemd units (service and timer)
-    for the given process (backup, check, or forget)
-    '''
-    working_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
-    python_path = sys.executable
-    
-    # Auto configure service unit file (resticbackup.service)
-    execstart = f'{python_path} {os.path.abspath(sys.argv[0])} {process}'
-    service_file_path = f'{working_dir}/systemd-units/resticbackup.service'
-
-    service_config = ConfigParser()
-    service_config.optionxform = str # preserve case
-    service_config.read(service_file_path)
-    service_config.set('Service', 'ExecStart', execstart)
-
-    with open(service_file_path, 'w') as file:
-        service_config.write(file,
-                             space_around_delimiters=False)
-
-    # Auto configure timer unit file (resticbackup.timer)
-    timer_file_path = f'{working_dir}/systemd-units/resticbackup.timer'
-    timer_config = ConfigParser()
-    timer_config.optionxform = str
-    timer_config.read(timer_file_path)
-
-    match process:
-        case "backup":
-            oncalendar_setting = settings.CALENDAR_BACKUP
-        case "check":
-            oncalendar_setting = settings.CALENDAR_CHECK
-        case "forget":
-            oncalendar_setting = settings.CALENDAR_FORGET
-
-    timer_config.set('Timer', 'OnCalendar', oncalendar_setting)
-
-    with open(timer_file_path, 'w') as file:
-        timer_config.write(file,
-                           space_around_delimiters=False)
-
-    # Copy units to /etc/systemd/system/ and run timer
-    p = subprocess.run(['sudo', 'cp',
-                        f'{working_dir}/systemd-units/resticbackup.service',
-                        f'/etc/systemd/system/resticbackup-{process}.service'])
-    p = subprocess.run(['sudo', 'cp',
-                        f'{working_dir}/systemd-units/resticbackup.timer',
-                        f'/etc/systemd/system/resticbackup-{process}.timer'])
-    p = subprocess.run(['sudo', 'systemctl', 'daemon-reload'])
-    p = subprocess.run(['sudo', 'systemctl', 'enable', f'resticbackup-{process}.timer'])
-    p = subprocess.run(['sudo', 'systemctl', 'start', f'resticbackup-{process}.timer'])
 
 def install():
     '''
     Install Systemd services and timers for each restic process
     '''
     print("Install Systemd services and timers")
-    install_proc("backup")
-    install_proc("check")
-    install_proc("forget")
-    
+
+    python_path = sys.executable
+    curr_script_path = os.path.abspath(sys.argv[0])
+
+    set_systemd.set_systemd("backup",
+                            f'{python_path} {curr_script_path} backup',
+                            settings.CALENDAR_BACKUP)
+    set_systemd.set_systemd("check",
+                            f'{python_path} {curr_script_path} check',
+                            settings.CALENDAR_CHECK)
+    set_systemd.set_systemd("forget",
+                            f'{python_path} {curr_script_path} forget',
+                            settings.CALENDAR_FORGET)
+
+
 def uninstall_proc(process):
     '''
     Remove Systemd units (service and timer) for the current script
@@ -173,6 +189,7 @@ def uninstall_proc(process):
                         f'/etc/systemd/system/resticbackup-{process}.service',
                         f'/etc/systemd/system/resticbackup-{process}.timer'])
     
+
 def uninstall():
     '''
     Remove Systemd services and timers for each restic process
@@ -199,40 +216,80 @@ def check_setup():
         print(p.stderr.decode())
         sys.exit(1)
 
-    # Test if signal-cli jsonRpc API daemon is up
-    # TODO
-
-def notify(msg: str):
-    '''
-    Execution report via Signal
-    '''
-    # TODO
+    # TODO Test if signal-cli jsonRpc API daemon is up
 
 
+def notify(url: str,
+           receiver: str,
+           msg: str) -> int:
+    """Execution report via Signal messenger API.
 
-print("Restic backup wrapper script")
+    Returns the response HTTP status code.
 
-check_setup()
+    Example :
+    notify("http://localhost:8008/api/v1/rpc",
+           "+33612345678",
+           "Restic script execution complete")
+    """
 
-if len(sys.argv) == 1:
-    print("Usage : resticback up.py <argument>\n" \
-          "Arguments :\n" \
-          "\tbackup : run a Restic backup\n" \
-          "\tcheck : full check the Restic backup repository\n" \
-          "\tforget : remove (Restic forget + prune) older snapshots applying the user settings (settings.py) policy\n" \
-          "\tinstall : install Systemd units (service and timer)\n" \
-          "\tuninstall : remove Systemd units")
-    sys.exit(0)
+    payload = {
+        'jsonrpc': '2.0',
+        'method': 'send',
+        'params': {
+            'recipient': [receiver],
+            'message': f"Resticbak notifier\n{msg}"
+        },
+        'id': 1
+    }
 
-elif len(sys.argv) > 2:
-    print("This scripts takes only one argument")
-    sys.exit(1)
+    headers = {
+        'Content-Type': 'application/json'
+    }
 
-arg = sys.argv[1]
+    # Sending the request
+    try:
+        response = requests.post(url,
+                                 headers=headers,
+                                 data=json.dumps(payload))
 
-match arg:
-    case "backup": backup()  
-    case "check": check()
-    case "forget": forget()
-    case "install": install()
-    case "uninstall": uninstall()
+        if response.status_code == 200:
+            print("Notification sent")
+            # print('Response:', response.json())
+        else:
+            print(f"Failed to send notification (code {response.status_code})")
+            print('Response:', response.text)
+            
+    except requests.ConnectionError:
+        print("Connection error, check if Signal daemon is running.")
+
+
+"""
+Program entry point
+"""
+if __name__ == "__main__":
+    print("Restic backup wrapper script")
+
+    check_setup()
+
+    if len(sys.argv) == 1:
+        print("Usage : resticback up.py <argument>\n" \
+            "Arguments :\n" \
+            "\tbackup : run a Restic backup\n" \
+            "\tcheck : full check the Restic backup repository\n" \
+            "\tforget : remove (Restic forget + prune) older snapshots applying the user settings (settings.py) policy\n" \
+            "\tinstall : install Systemd units (service and timer)\n" \
+            "\tuninstall : remove Systemd units")
+        sys.exit(0)
+
+    elif len(sys.argv) > 2:
+        print("This scripts takes only one argument")
+        sys.exit(1)
+
+    arg = sys.argv[1]
+
+    match arg:
+        case "backup": backup()  
+        case "check": check()
+        case "forget": forget()
+        case "install": install()
+        case "uninstall": uninstall()

@@ -240,6 +240,7 @@ def manage():
 
             continue
 
+
 def run_daemon(port:str=None,
                account:str=None):
     """
@@ -325,18 +326,21 @@ def message_test(port, account):
     }
 
     # Sending the request
-    response = requests.post(url,
-                             headers=headers,
-                             data=json.dumps(payload))
+    try:
+        response = requests.post(url,
+                                headers=headers,
+                                data=json.dumps(payload))
 
-    # Handling the response
-    if response.status_code == 200:
-        print('Message sent successfully!')
-        print('Response:', response.json())
-    else:
-        print('Failed to send message')
-        print('Status code:', response.status_code)
-        print('Response:', response.text)
+        # Handling the response
+        if response.status_code == 200:
+            print('Message sent successfully!')
+            print('Response:', response.json())
+        else:
+            print('Failed to send message')
+            print('Status code:', response.status_code)
+            print('Response:', response.text)
+    except requests.ConnectionError:
+        print("Connection error, check if Signal daemon is running.")
 
 
 def menu_gen(title:str,
