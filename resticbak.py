@@ -93,9 +93,10 @@ def backup():
                    settings.SIGNAL_RECEIVER,
                    summary)
     else:
-        notify(settings.SIGNAL_API_URL,
-               settings.SIGNAL_RECEIVER,
-               "Backup ERROR")
+        if settings.NOTIFY:
+            notify(settings.SIGNAL_API_URL,
+                   settings.SIGNAL_RECEIVER,
+                   "Backup ERROR")
         sys.exit(1)
 
 
@@ -119,20 +120,21 @@ def check():
     for line in ps.stdout:
         print(line, end='')
 
-    for error_line in ps.stderr:
-        print(error_line, end='')
+    for err_line in ps.stderr:
+        print(err_line, end='')
 
     ps.wait()
 
-    if ps.returncode == 0:     
+    if ps.returncode == 0:
         if settings.NOTIFY:
             notify(settings.SIGNAL_API_URL,
                    settings.SIGNAL_RECEIVER,
-                   ps.stdout)
+                   f"Check successful\n{line}")
     else:
-        notify(settings.SIGNAL_API_URL,
-               settings.SIGNAL_RECEIVER,
-               "Check ERROR")
+        if settings.NOTIFY:
+            notify(settings.SIGNAL_API_URL,
+                   settings.SIGNAL_RECEIVER,
+                   f"Check ERROR\n{line}")
         sys.exit(1)
 
 
@@ -151,42 +153,50 @@ def forget():
                            stdout=subprocess.PIPE,
                            stderr=subprocess.PIPE)
     
+    out_str = ""
+    err_str = ""
+
+    # Will iterate only once : as of Restic v0.17,
+    # output of forget command is one single json object
     for line in ps.stdout:
         print(line, end='')
+        out_str = line
 
-    for error_line in ps.stderr:
-        print(error_line, end='')
+    for err_line in ps.stderr:
+        print(err_line, end='')
+        err_str = err_line
 
     ps.wait()
 
     if ps.returncode == 0:
-        # Will iterate only once : as of Restic v0.17,
-        # output of forget command is one single json object
-        for line in ps.stdout:
-            out_json = json.loads(line)
-
-        total_keep = 0
-        total_remove = 0
-
-        for v in out_json:
-            if v["keep"]:
-                total_keep += len(v["keep"])
-
-            if v["remove"]:
-                total_remove += len(v["remove"])
-
-        summary = "Forget successful\n" \
-                 f"Snapshots kept : {str(total_keep)}\n" \
-                 f"Snapshots removed : {str(total_remove)}\n"
-
         if settings.NOTIFY:
+
+            out_json = json.loads(out_str)
+
+            total_keep = 0
+            total_remove = 0
+
+            for v in out_json:
+                if v["keep"]:
+                    total_keep += len(v["keep"])
+
+                if v["remove"]:
+                    total_remove += len(v["remove"])
+
+            summary = "Forget successful\n" \
+                    f"Snapshots kept : {str(total_keep)}\n" \
+                    f"Snapshots removed : {str(total_remove)}\n"
+
             notify(settings.SIGNAL_API_URL,
                    settings.SIGNAL_RECEIVER,
                    summary)
+            
     else:
-        notify(settings.SIGNAL_API_URL,
-               settings.SIGNAL_RECEIVER,
-               "Forget ERROR")
+        if settings.NOTIFY:
+            notify(settings.SIGNAL_API_URL,
+                settings.SIGNAL_RECEIVER,
+                f"Forget ERROR\n{err_str}")
+
         sys.exit(1)
 
 
