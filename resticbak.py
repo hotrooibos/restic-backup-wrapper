@@ -74,27 +74,28 @@ def backup():
     ps.wait()
 
     if ps.returncode == 0:
-        summary = "Backup successful\n" \
-                  f"- {sumj['files_new']} new files\n" \
-                  f"- {sumj['files_changed']} changed files\n" \
-                  f"- {sumj['files_unmodified']} unmodified files\n" \
-                  f"- {sumj['dirs_new']} new directories\n" \
-                  f"- {sumj['dirs_changed']} changed directories\n" \
-                  f"- {sumj['dirs_unmodified']} unmodified directories\n" \
-                  f"- {sumj['data_blobs']} data blobs\n" \
-                  f"- {sumj['tree_blobs']} tree blobs\n" \
-                  f"- {sumj['data_added']} data added\n" \
-                  f"- {sumj['total_files_processed']} files processed\n" \
-                  f"- {sumj['total_bytes_processed']} bytes processed\n" \
-                  f"- Backup duration : {sumj['total_duration']}s\n" \
-                  f"- Snapshot ID : {sumj['snapshot_id']}"
-        
         if settings.NOTIFY:
+            summary = "Backup successful\n" \
+                     f"- {sumj['files_new']} new files\n" \
+                     f"- {sumj['files_changed']} changed files\n" \
+                     f"- {sumj['files_unmodified']} unmodified files\n" \
+                     f"- {sumj['dirs_new']} new directories\n" \
+                     f"- {sumj['dirs_changed']} changed directories\n" \
+                     f"- {sumj['dirs_unmodified']} unmodified directories\n" \
+                     f"- {sumj['data_blobs']} data blobs\n" \
+                     f"- {sumj['tree_blobs']} tree blobs\n" \
+                     f"- {sumj['data_added']} data added\n" \
+                     f"- {sumj['total_files_processed']} files processed\n" \
+                     f"- {sumj['total_bytes_processed']} bytes processed\n" \
+                     f"- Backup duration : {sumj['total_duration']}s\n" \
+                     f"- Snapshot ID : {sumj['snapshot_id']}"
             notify(settings.SIGNAL_API_URL,
                    settings.SIGNAL_RECEIVER,
                    summary)
     else:
-        print(ps.stderr.decode())
+        notify(settings.SIGNAL_API_URL,
+               settings.SIGNAL_RECEIVER,
+               "Backup ERROR")
         sys.exit(1)
 
 
@@ -108,7 +109,7 @@ def check():
     NB : Restic also support file size (in K/M/G/T), so for example it can be data="1G"
     to check 1 Gigabyte randomly picked from the backup data.
     '''
-    # restic check --read-data-subset=x% --json
+    # restic check --read-data-subset=x%
     ps = subprocess.Popen(["restic", "check",
                           f"--read-data-subset={settings.CHECK_SUBSET}"],
                           text=True,
@@ -121,40 +122,71 @@ def check():
     for error_line in ps.stderr:
         print(error_line, end='')
 
-    if ps.returncode == 0:
-        print(ps.stdout)
-        
+    ps.wait()
+
+    if ps.returncode == 0:     
         if settings.NOTIFY:
             notify(settings.SIGNAL_API_URL,
                    settings.SIGNAL_RECEIVER,
                    ps.stdout)
     else:
-        print(ps.stderr.decode())
+        notify(settings.SIGNAL_API_URL,
+               settings.SIGNAL_RECEIVER,
+               "Check ERROR")
         sys.exit(1)
 
 
 def forget():
-    # restic forget --prune --keep-last 5 --keep-daily 5 --keep-weekly 5 --keep-monthly 5 --keep-yearly 5
-    ps = subprocess.run(["restic", "forget",
-                         "--keep-last", str(settings.KEEP_LAST),
-                         "--keep-daily", str(settings.KEEP_DAILY),
-                         "--keep-weekly", str(settings.KEEP_WEEKLY),
-                         "--keep-monthly", str(settings.KEEP_MONTHLY),
-                         "--keep-yearly", str(settings.KEEP_YEARLY),
-                         # "--dry-run",
-                         "--prune"],
-                         stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE)
+    # restic forget --prune --keep-last 5 --keep-daily 5 --keep-weekly 5 --keep-monthly 5 --keep-yearly 5 --json
+    ps = subprocess.Popen(["restic", "forget",
+                           "--prune",
+                           "--keep-last", str(settings.KEEP_LAST),
+                           "--keep-daily", str(settings.KEEP_DAILY),
+                           "--keep-weekly", str(settings.KEEP_WEEKLY),
+                           "--keep-monthly", str(settings.KEEP_MONTHLY),
+                           "--keep-yearly", str(settings.KEEP_YEARLY),
+                           # "--dry-run",
+                           "--json"],
+                           text=True,
+                           stdout=subprocess.PIPE,
+                           stderr=subprocess.PIPE)
     
+    for line in ps.stdout:
+        print(line, end='')
+
+    for error_line in ps.stderr:
+        print(error_line, end='')
+
+    ps.wait()
+
     if ps.returncode == 0:
-        print(ps.stdout.decode())
-        
+        # Will iterate only once : as of Restic v0.17,
+        # output of forget command is one single json object
+        for line in ps.stdout:
+            out_json = json.loads(line)
+
+        total_keep = 0
+        total_remove = 0
+
+        for v in out_json:
+            if v["keep"]:
+                total_keep += len(v["keep"])
+
+            if v["remove"]:
+                total_remove += len(v["remove"])
+
+        summary = "Forget successful\n" \
+                 f"Snapshots kept : {str(total_keep)}\n" \
+                 f"Snapshots removed : {str(total_remove)}\n"
+
         if settings.NOTIFY:
             notify(settings.SIGNAL_API_URL,
                    settings.SIGNAL_RECEIVER,
-                   ps.stdout.decode())
+                   summary)
     else:
-        print(ps.stderr.decode())
+        notify(settings.SIGNAL_API_URL,
+               settings.SIGNAL_RECEIVER,
+               "Forget ERROR")
         sys.exit(1)
 
 
