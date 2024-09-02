@@ -1,0 +1,13 @@
+[Unit]
+Description=Service for Restic Backup script
+After=
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python /home/tda/Git/hotrooibos/restic-backup-wrapper/resticbak.py forget
+Restart=on-failure
+RestartSec=600
+
+[Install]
+WantedBy=multi-user.target
+

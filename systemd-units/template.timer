@@ -1,0 +1,12 @@
+[Unit]
+Description=Service for Restic Backup script
+
+[Timer]
+OnCalendar=monthly
+OnStartupSec=60m
+RandomizedDelaySec=120m
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+

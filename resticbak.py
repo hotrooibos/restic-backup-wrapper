@@ -101,7 +101,7 @@ def backup():
 
 
 def check():
-    '''
+    """
     Perform a structural consistency and integrity verifications of the repository,
     and an integrity check for the given % from user settings of the backed up data
     (restic repository pack files), randomly chosen by restic.
@@ -109,7 +109,7 @@ def check():
     
     NB : Restic also support file size (in K/M/G/T), so for example it can be data="1G"
     to check 1 Gigabyte randomly picked from the backup data.
-    '''
+    """
     # restic check --read-data-subset=x%
     ps = subprocess.Popen(["restic", "check",
                           f"--read-data-subset={settings.CHECK_SUBSET}"],
@@ -201,29 +201,61 @@ def forget():
 
 
 def install():
-    '''
+    """
     Install Systemd services and timers for each restic process
-    '''
+    """
     print("Install Systemd services and timers")
 
     python_path = sys.executable
     curr_script_path = os.path.abspath(sys.argv[0])
 
-    set_systemd.set_systemd("backup",
-                            f'{python_path} {curr_script_path} backup',
-                            settings.CALENDAR_BACKUP)
-    set_systemd.set_systemd("check",
-                            f'{python_path} {curr_script_path} check',
-                            settings.CALENDAR_CHECK)
-    set_systemd.set_systemd("forget",
-                            f'{python_path} {curr_script_path} forget',
-                            settings.CALENDAR_FORGET)
+    systemd_descr = "Service for Restic Backup script"
+    
+    # Backup process
+    set_systemd.set_service(unit_filename="resticbackup-backup",
+                            description=systemd_descr,
+                            after="",
+                            type="oneshot",
+                            execstart=f"{python_path} {curr_script_path} backup",
+                            restart="on-failure",
+                            restartsec="2400")
+    
+    set_systemd.set_timer(unit_filename="resticbackup-backup",
+                          description=systemd_descr,
+                          oncalendar=settings.CALENDAR_BACKUP)
+
+
+    # Check process
+    set_systemd.set_service(unit_filename="resticbackup-check",
+                            description=systemd_descr,
+                            after="",
+                            type="oneshot",
+                            execstart=f"{python_path} {curr_script_path} check",
+                            restart="on-failure",
+                            restartsec="60")
+    
+    set_systemd.set_timer(unit_filename="resticbackup-check",
+                          description=systemd_descr,
+                          oncalendar=settings.CALENDAR_CHECK)
+
+    # Forget process
+    set_systemd.set_service(unit_filename="resticbackup-forget",
+                            description=systemd_descr,
+                            after="",
+                            type="oneshot",
+                            execstart=f"{python_path} {curr_script_path} forget",
+                            restart="on-failure",
+                            restartsec="600")
+    
+    set_systemd.set_timer(unit_filename="resticbackup-forget",
+                          description=systemd_descr,
+                          oncalendar=settings.CALENDAR_FORGET)
 
 
 def uninstall_proc(process):
-    '''
+    """
     Remove Systemd units (service and timer) for the current script
-    '''
+    """
     working_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
     p = subprocess.run(['sudo', 'systemctl', 'stop', f'resticbackup-{process}.timer'])
     p = subprocess.run(['sudo', 'systemctl', 'disable', f'resticbackup-{process}.timer'])
@@ -233,9 +265,9 @@ def uninstall_proc(process):
     
 
 def uninstall():
-    '''
+    """
     Remove Systemd services and timers for each restic process
-    '''
+    """
     print("Remove Systemd services and timers")
     uninstall_proc("backup")
     uninstall_proc("check")
