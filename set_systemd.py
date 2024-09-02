@@ -3,13 +3,13 @@ import os
 import subprocess
 import sys
 
-def set_service(unit_filename: str,
-                description: str,
-                after: str,
-                type: str,
-                execstart: str,
-                restart: str,
-                restartsec: str):
+def service(unit_filename: str,
+            description: str,
+            after: str,
+            type: str,
+            execstart: str,
+            restart: str,
+            restartsec: str):
     """
     Auto configure and install Systemd units (service and timer)
     for the given process (backup, check, or forget)
@@ -46,9 +46,9 @@ def set_service(unit_filename: str,
                     'daemon-reload'])
 
 
-def set_timer(unit_filename: str,
-              description: str,
-              oncalendar: str):
+def timer(unit_filename: str,
+          description: str,
+          oncalendar: str):
     """
     Auto configure and install Systemd timer unit
     for the given process (backup, check, or forget)

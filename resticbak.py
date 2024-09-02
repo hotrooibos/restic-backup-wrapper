@@ -212,7 +212,7 @@ def install():
     systemd_descr = "Service for Restic Backup script"
     
     # Backup process
-    set_systemd.set_service(unit_filename="resticbackup-backup",
+    set_systemd.service(unit_filename="resticbackup-backup",
                             description=systemd_descr,
                             after="",
                             type="oneshot",
@@ -220,13 +220,12 @@ def install():
                             restart="on-failure",
                             restartsec="2400")
     
-    set_systemd.set_timer(unit_filename="resticbackup-backup",
+    set_systemd.timer(unit_filename="resticbackup-backup",
                           description=systemd_descr,
                           oncalendar=settings.CALENDAR_BACKUP)
 
-
     # Check process
-    set_systemd.set_service(unit_filename="resticbackup-check",
+    set_systemd.service(unit_filename="resticbackup-check",
                             description=systemd_descr,
                             after="",
                             type="oneshot",
@@ -234,12 +233,12 @@ def install():
                             restart="on-failure",
                             restartsec="60")
     
-    set_systemd.set_timer(unit_filename="resticbackup-check",
+    set_systemd.timer(unit_filename="resticbackup-check",
                           description=systemd_descr,
                           oncalendar=settings.CALENDAR_CHECK)
 
     # Forget process
-    set_systemd.set_service(unit_filename="resticbackup-forget",
+    set_systemd.service(unit_filename="resticbackup-forget",
                             description=systemd_descr,
                             after="",
                             type="oneshot",
@@ -247,7 +246,7 @@ def install():
                             restart="on-failure",
                             restartsec="600")
     
-    set_systemd.set_timer(unit_filename="resticbackup-forget",
+    set_systemd.timer(unit_filename="resticbackup-forget",
                           description=systemd_descr,
                           oncalendar=settings.CALENDAR_FORGET)
 

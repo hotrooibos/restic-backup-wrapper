@@ -5,9 +5,9 @@
 import json
 import re
 import requests
+import set_systemd
 import subprocess
 import sys
-import threading
 
 REQ_JAVA_VERSION = 21
 
@@ -241,28 +241,29 @@ def manage():
             continue
 
 
-def run_daemon(port:str=None,
-               account:str=None):
+def setup_daemon() -> tuple:
     """
-    Run the JSON RPC API daemon via HTTP.
-    If specified in arguments, port should be in range 1024-65535
-    and account should already be registered locally and given
-    at the format "+XXXXXXXXXXX".
-    Exemple : run_daemon(port="8080", account="+33612345678")
-    """
-    print("\nRun daemon")
+    Show a setup menu for the Signal daemon
+    Port should be in range 1024-65535 and account should
+    already be registered locally and given at the format "+XXXXXXXXXXX".
+    
+    Returns a tuple with two strings : port, signal account
 
+    Example :
+
+        ("8008", "+33612345678")
+    """
     # Set tcp port listened by daemon
-    while port is None:
+    while True:
         port = input("On what local host port will signal-cli daemon " \
-                    "run ? [default : 8008]\n:")
-        
+                     "run ? [default : 8008]\n:")
+                
         if port == "":
             port = "8008"
 
         # Numbers from 1024 to 65535 
-        pattern = "^(102[4-9]|10[3-9]\\d|1[1-9]\\d{2}|[2-9]\\d{3}|[1-5]\\d{4}" \
-                "|6[0-4]\\d{3}|65[0-4]\\d|655[0-2]\\d|6553[0-5])$"
+        pattern = "^(102[4-9]|10[3-9]\\d|1[1-9]\\d{2}|[2-9]\\d{3}|[1-5]" \
+                  "\\d{4}|6[0-4]\\d{3}|65[0-4]\\d|655[0-2]\\d|6553[0-5])$"
 
         match = re.search(pattern, port)
 
@@ -270,26 +271,43 @@ def run_daemon(port:str=None,
             break
         else:
             print("Port must be in range 1024-65535).")
-            port = None
-    
+
     # Pick the Signal account (phone number) to be used by daemon
-    if account is None:
-        accounts = get_local_accounts(return_unregistered=False)
+    accounts = get_local_accounts(return_unregistered=False)
 
-        if len(accounts) == 0:
-            print("No registered Signal account found, register one first.")
+    if len(accounts) == 0:
+        print("No registered Signal account found, register one first.")
+        return
+
+    while len(accounts) > 0:
+        inp = menu_gen("Which Signal account will be used ?",
+                    accounts)
+        
+        if inp == "0":
             return
-
-        while len(accounts) > 0:
-            inp = menu_gen("Which Signal account will be used ?",
-                        accounts)
-            
-            if inp == "0":
-                return
-            elif int(inp) in range(1, len(accounts)+1):
-                account = accounts[int(inp)-1]
-                break
+        elif int(inp) in range(1, len(accounts)+1):
+            account = accounts[int(inp)-1]
+            break
     
+    return port, account
+
+
+def run_daemon(port: str=None,
+               account: str=None):
+    """
+    Run the JSON RPC API daemon via HTTP.
+    If no argument are given, will run the daemon setup.
+
+    Exemple : run_daemon(port="8080", account="+33612345678")
+    """
+    print("\nRun daemon")
+
+    # Run daemon setup menu if no port/account given
+    if not port or not account:
+        setup_values = setup_daemon()
+        port = setup_values[0]
+        account = setup_values[1]
+
     # Run daemon
     # signal-cli -a +33123456789 daemon --http=localhost:8008
     print(f"\nRunning daemon with user account {account} on port {port}" \
@@ -302,7 +320,23 @@ def run_daemon(port:str=None,
     
 
 def install_daemon():
-    print("TODO")
+    """
+    Install JSON RPC API daemon with Systemd.
+    """
+    print("\nInstall daemon")
+    # Run daemon setup menu
+    setup_values = setup_daemon()
+    port = setup_values[0]
+    account = setup_values[1]
+
+    set_systemd.service(unit_filename="signal-daemon",
+                        description="Signal-cli daemon for JSON-RPC API",
+                        after="network.target",
+                        type="simple",
+                        execstart=f"signal-cli -a {account} daemon " \
+                                  f"-http=localhost:{port}",
+                        restart="on-failure",
+                        restartsec=60)
 
 
 def message_test(port, account):
