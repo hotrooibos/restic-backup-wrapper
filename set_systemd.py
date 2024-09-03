@@ -10,6 +10,7 @@ def service(unit_filename: str,
             execstart: str,
             restart: str,
             restartsec: str,
+            user: str,
             startnow: bool = False):
     """
     Auto configure and install Systemd units (service and timer)
@@ -32,6 +33,7 @@ def service(unit_filename: str,
     service_config.set('Service', 'ExecStart', execstart)
     service_config.set('Service', 'Restart', restart)
     service_config.set('Service', 'RestartSec', restartsec)
+    service_config.set('Service', 'User', user)
 
     # Write changes to template file
     with open(template_path, 'w') as file:
@@ -51,7 +53,7 @@ def service(unit_filename: str,
 
     if startnow == True:
         subprocess.run(['sudo', 'systemctl',
-                        'start', f'{unit_filename}.timer'])
+                        'start', f'{unit_filename}.service'])
 
 
 def timer(unit_filename: str,

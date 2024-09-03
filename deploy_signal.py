@@ -332,11 +332,13 @@ def install_daemon():
     set_systemd.service(unit_filename="signal-daemon",
                         description="Signal-cli daemon for JSON-RPC API",
                         after="network.target",
-                        type="simple",
+                        t0ype="simple",
                         execstart=f"signal-cli -a {account} daemon " \
-                                  f"-http=localhost:{port}",
+                                  f"--http=localhost:{port}",
                         restart="on-failure",
-                        restartsec="60")
+                        restartsec="60",
+                        user="tda",
+                        startnow=True)
 
 
 def message_test(port, account):
@@ -414,7 +416,7 @@ if __name__ == "__main__":
                     ["Check config",
                     "Signal management",
                     "Run API daemon (JSON RPC)",
-                    "(TODO) Install daemon with Systemd"])
+                    "Install/uninstall API daemon with Systemd"])
 
         if inp == "0":
             sys.exit(0)
