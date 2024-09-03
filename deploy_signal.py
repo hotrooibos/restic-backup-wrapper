@@ -314,7 +314,7 @@ def run_daemon(port: str=None,
           "\nPress Ctrl+C at any time to shut it down.")
     try:
         ps = subprocess.run(['signal-cli', '-a', account,
-                            'daemon', f'--http=localhost:{port}'])
+                             'daemon', f'--http=localhost:{port}'])
     except KeyboardInterrupt:
         return
     
@@ -336,7 +336,7 @@ def install_daemon():
                         execstart=f"signal-cli -a {account} daemon " \
                                   f"-http=localhost:{port}",
                         restart="on-failure",
-                        restartsec=60)
+                        restartsec="60")
 
 
 def message_test(port, account):

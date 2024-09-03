@@ -9,7 +9,8 @@ def service(unit_filename: str,
             type: str,
             execstart: str,
             restart: str,
-            restartsec: str):
+            restartsec: str,
+            startnow: bool = False):
     """
     Auto configure and install Systemd units (service and timer)
     for the given process (backup, check, or forget)
@@ -44,6 +45,13 @@ def service(unit_filename: str,
 
     subprocess.run(['sudo', 'systemctl',
                     'daemon-reload'])
+    
+    subprocess.run(['sudo','systemctl',
+                    'enable', f'{unit_filename}.service'])
+
+    if startnow == True:
+        subprocess.run(['sudo', 'systemctl',
+                        'start', f'{unit_filename}.timer'])
 
 
 def timer(unit_filename: str,
