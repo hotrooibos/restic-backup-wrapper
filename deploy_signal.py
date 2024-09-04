@@ -3,6 +3,7 @@
 # Automatize the signal-cli deployment
 
 import json
+import getpass
 import re
 import requests
 import set_systemd
@@ -45,7 +46,7 @@ def check_java():
 
 
 def check_signal_cli():
-    print("Check signal-cli", end='', flush=True)
+    print("Check signal-cli installation", end='', flush=True)
     
     try:
         p = subprocess.run(["signal-cli",
@@ -54,15 +55,60 @@ def check_signal_cli():
                             stderr=subprocess.PIPE)
         
         print(f" -> OK")
-
+    
     except FileNotFoundError as e:
         print(" -> KO, signal-cli not found, install it if it's not, or check your PATH." \
               "\n\nDownload the latest linux native release here : " \
               "https://github.com/AsamK/signal-cli/releases/latest, and " \
-              "install it in /usr/local/bin/." \
+              "copy it in /usr/local/bin/." \
               f"\nOutput :\n\t{e}")
         sys.exit(1)
 
+    print("Check signal-cli daemon", end='', flush=True)
+
+    # Check if signalcli process is running and get its arguments
+    ps = subprocess.run(
+        ['ps', '-eo', 'comm=,args='],  # `comm` for command name, `args` for full command line
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=True
+    )
+
+    match = [
+        line for line in ps.stdout.splitlines()
+        if line.startswith("signal-cli") and "daemon" in line
+    ]
+
+    if match:
+        print(f" --> OK, daemon is running")
+
+        for process_info in match:
+            parts = process_info.split(maxsplit=1)
+            argument_list = parts[1].split() if len(parts) > 1 else []
+
+        for arg in argument_list:
+            if "--http" in arg:
+                url = arg.split('=')[1]
+        
+        if url:
+            url = f'http://{url}/api/v1/check'
+
+            response = requests.get(url)
+
+            if response.status_code == 200:
+                print("Test JSON-RPC HTTP API --> OK")
+            else:
+                print(f"Test JSON-RPC HTTP API --> KO (code {response})")
+
+        else:
+            print(f"Test JSON-RPC HTTP API --> KO (no HTTP endpoint found)")
+            return
+        
+    else:
+        print(f" --> KO, no 'signal-cli' process found")
+        return
+    
 
 def check_qrencode():
     try:
@@ -289,7 +335,16 @@ def setup_daemon() -> tuple:
             account = accounts[int(inp)-1]
             break
     
-    return port, account
+    # Define which local user account will be used to run the daemon
+    # By default, it will use the user used to run this script
+    curr_user = getpass.getuser()
+
+    user = input(f"What user should be used to run the daemon ? [default : {curr_user}]")
+    
+    if not user:
+        user = curr_user
+    
+    return port, account, user
 
 
 def run_daemon(port: str=None,
@@ -328,16 +383,17 @@ def install_daemon():
     setup_values = setup_daemon()
     port = setup_values[0]
     account = setup_values[1]
+    user = setup_values[2]
 
     set_systemd.service(unit_filename="signal-daemon",
                         description="Signal-cli daemon for JSON-RPC API",
                         after="network.target",
-                        t0ype="simple",
+                        type="simple",
                         execstart=f"signal-cli -a {account} daemon " \
                                   f"--http=localhost:{port}",
                         restart="on-failure",
                         restartsec="60",
-                        user="tda",
+                        user=user,
                         startnow=True)
 
 
@@ -424,7 +480,7 @@ if __name__ == "__main__":
         elif inp == "1":
             check_java()
             check_signal_cli()
-            message_test("8008", "+33612345678")
+            # message_test("8008", "+33612345678")
         
         elif inp == "2":
             manage()
