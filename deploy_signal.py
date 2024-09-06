@@ -374,6 +374,30 @@ def run_daemon(port: str=None,
         return
     
 
+def daemon_setup():
+    """
+    Install daemon if it's not already installed, uninstall it otherwise.
+    """
+    # Check if signalcli process is running and get its arguments
+    ps = subprocess.run(['ps', '-eo', 'comm=,args='],  # `comm` for command name, `args` for full command line
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=True
+    )
+
+    match = [
+        line for line in ps.stdout.splitlines()
+        if line.startswith("signal-cli") and "daemon" in line
+    ]
+
+    # Daemon is running
+    if match:
+        uninstall_daemon()
+    else:
+        install_daemon()
+    
+
 def install_daemon():
     """
     Install JSON RPC API daemon with Systemd.
@@ -395,6 +419,15 @@ def install_daemon():
                         restartsec="60",
                         user=user,
                         startnow=True)
+    
+
+def uninstall_daemon():
+    """
+    Remove Signal-cli Systemd service
+    """
+    print("Remove Systemd daemon")
+
+    set_systemd.uninstall('signal-daemon.service')
 
 
 def message_test(port, account):
@@ -489,4 +522,4 @@ if __name__ == "__main__":
             run_daemon()
 
         elif inp == "4":
-            install_daemon()
+            daemon_setup()

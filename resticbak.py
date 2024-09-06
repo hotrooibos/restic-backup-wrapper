@@ -213,64 +213,60 @@ def install():
     
     # Backup process
     set_systemd.service(unit_filename="resticbackup-backup",
-                            description=systemd_descr,
-                            after="",
-                            type="oneshot",
-                            execstart=f"{python_path} {curr_script_path} backup",
-                            restart="on-failure",
-                            restartsec="2400")
+                        description=systemd_descr,
+                        after="",
+                        type="oneshot",
+                        execstart=f"{python_path} {curr_script_path} backup",
+                        restart="on-failure",
+                        restartsec="2400",
+                        user="tda")
     
     set_systemd.timer(unit_filename="resticbackup-backup",
-                          description=systemd_descr,
-                          oncalendar=settings.CALENDAR_BACKUP)
+                      description=systemd_descr,
+                      oncalendar=settings.CALENDAR_BACKUP)
 
     # Check process
     set_systemd.service(unit_filename="resticbackup-check",
-                            description=systemd_descr,
-                            after="",
-                            type="oneshot",
-                            execstart=f"{python_path} {curr_script_path} check",
-                            restart="on-failure",
-                            restartsec="60")
+                        description=systemd_descr,
+                        after="",
+                        type="oneshot",
+                        execstart=f"{python_path} {curr_script_path} check",
+                        restart="on-failure",
+                        restartsec="60",
+                        user="tda")
     
     set_systemd.timer(unit_filename="resticbackup-check",
-                          description=systemd_descr,
-                          oncalendar=settings.CALENDAR_CHECK)
+                      description=systemd_descr,
+                      oncalendar=settings.CALENDAR_CHECK)
 
     # Forget process
     set_systemd.service(unit_filename="resticbackup-forget",
-                            description=systemd_descr,
-                            after="",
-                            type="oneshot",
-                            execstart=f"{python_path} {curr_script_path} forget",
-                            restart="on-failure",
-                            restartsec="600")
+                        description=systemd_descr,
+                        after="",
+                        type="oneshot",
+                        execstart=f"{python_path} {curr_script_path} forget",
+                        restart="on-failure",
+                        restartsec="600",
+                        user="tda")
     
     set_systemd.timer(unit_filename="resticbackup-forget",
-                          description=systemd_descr,
-                          oncalendar=settings.CALENDAR_FORGET)
+                      description=systemd_descr,
+                      oncalendar=settings.CALENDAR_FORGET)
 
-
-def uninstall_proc(process):
-    """
-    Remove Systemd units (service and timer) for the current script
-    """
-    working_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
-    p = subprocess.run(['sudo', 'systemctl', 'stop', f'resticbackup-{process}.timer'])
-    p = subprocess.run(['sudo', 'systemctl', 'disable', f'resticbackup-{process}.timer'])
-    p = subprocess.run(['sudo', 'rm',
-                        f'/etc/systemd/system/resticbackup-{process}.service',
-                        f'/etc/systemd/system/resticbackup-{process}.timer'])
-    
 
 def uninstall():
     """
     Remove Systemd services and timers for each restic process
     """
     print("Remove Systemd services and timers")
-    uninstall_proc("backup")
-    uninstall_proc("check")
-    uninstall_proc("forget")
+
+    set_systemd.uninstall('resticbackup-backup.service',
+                          'resticbackup-backup.timer',
+                          'resticbackup-check.service',
+                          'resticbackup-check.timer',
+                          'resticbackup-forget.service',
+                          'resticbackup-forget.timer',)
+
 
 def check_setup():
     # Test if restic is installed, check backup

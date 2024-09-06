@@ -95,3 +95,27 @@ def timer(unit_filename: str,
 
     subprocess.run(['sudo', 'systemctl',
                     'start', f'{unit_filename}.timer'])
+
+
+def uninstall(*args):
+    """
+    Remove Systemd units (service and/or timer)
+
+    Example :
+
+    set_systemd.uninstall("resticbackup-check.timer",
+                          "signal-daemon.service")
+    
+    Will stop and disable these units, and remove
+    these files from /etc/systemd/system/
+    """
+    
+    for unit in args:
+        subprocess.run(['sudo', 'systemctl',
+                        'stop', unit])
+        
+        subprocess.run(['sudo', 'systemctl',
+                        'disable', unit])
+        
+        subprocess.run(['sudo', 'rm',
+                        f'/etc/systemd/system/{unit}'])
